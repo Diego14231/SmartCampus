@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-950 text-white;
+  margin: 0;
+  font-family: 'Urbanist', sans-serif;
+}
