@@ -16,7 +16,7 @@ function App() {
       console.error("Error al conectar con el backend:", error);
     }
   };
-
+  console.log("Componente montado")
   // Esto ejecuta la función apenas se abre la web y cada 30 segundos
   useEffect(() => {
     fetchStatus();
