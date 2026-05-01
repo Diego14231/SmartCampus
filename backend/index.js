@@ -28,28 +28,48 @@ app.post('/api/update', async (req, res) => {
   }
 
   try {
-    // 2. Verificar si la sala ya existe
+    // 1. Buscamos si la sala ya existe globalmente por su nombre (idSala)
     const salaExistente = await Sala.findOne({ idSala });
 
-    // 3. Si es una sala NUEVA, verificar que no exceda el límite de 5 por piso
-    if (!salaExistente) {
-      const salasEnEsePiso = await Sala.countDocuments({ piso });
-      if (salasEnEsePiso >= 5) {
-        return res.status(400).json({ error: `El piso ${piso} ya tiene el máximo de 5 salas.` });
-      }
+    if (salaExistente) {
+        // 2. Si la sala ya existe y el usuario intenta cambiarla de piso:
+        if (salaExistente.piso !== piso) {
+            // Verificamos si el piso de DESTINO tiene espacio
+            const salasEnDestino = await Sala.countDocuments({ piso });
+            if (salasEnDestino >= 5) {
+                return res.status(400).json({ 
+                    error: `No se puede mover la sala: el piso ${piso} ya alcanzó el máximo de 5 salas.` 
+                });
+            }
+            // Si tiene espacio, actualizamos el piso
+            salaExistente.piso = piso;
+        }
+
+        // 3. Actualizamos los demás datos (esté en el mismo piso o no)
+        salaExistente.ocupada = ocupada;
+        salaExistente.ultimaActualizacion = Date.now();
+        
+        await salaExistente.save();
+        return res.status(200).json(salaExistente);
     }
 
-    // 4. Si pasó los filtros, guardamos o actualizamos
-    const sala = await Sala.findOneAndUpdate(
-      { idSala },
-      { piso, ocupada, ultimaActualizacion: Date.now() },
-      { returnDocument: 'after', upsert: true }
-    );
+    // 4. Si la sala es NUEVA (no existía en ningún piso):
+    const salasNuevasEnPiso = await Sala.countDocuments({ piso });
+    if (salasNuevasEnPiso >= 5) {
+        return res.status(400).json({ 
+            error: `El piso ${piso} ya tiene el máximo de 5 salas.` 
+        });
+    }
 
-    res.status(200).json(sala);
-  } catch (error) {
+    // 5. Creamos la sala desde cero
+    const nuevaSala = new Sala({ idSala, piso, ocupada });
+    await nuevaSala.save();
+    res.status(201).json(nuevaSala);
+
+} catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Error interno del servidor" });
-  }
+}
 });
 
 // 2. GET: El Frontend (React) pide cuántas salas libres hay por piso
@@ -62,10 +82,11 @@ app.get('/api/status', async (req, res) => {
         $group: { 
           _id: "$piso",                // 2. Agrúpalas por piso
           totalDisponibles: { $sum: 1 }, // 3. Cuenta cuántas hay en ese grupo
+          totalMaximo: { $literal: 5 }, // Agregamos el total fijo de 5 salas por piso
           ultimaActualizacion: { $max: "$ultimaActualizacion" } // 4. Busca la hora más reciente del piso
         } 
       },
-      { $sort: { _id: 1 } } // Ordena por piso (Piso 1, luego Piso 2)
+      { $sort: { _id: -1 } } // Ordena por piso (Piso 1, luego Piso 2)
     ]);
 
     res.status(200).json(resumen);
@@ -74,7 +95,7 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// 3. GET: Dashboard de Administrador (Para la lógica de los 12 minutos)
+// 3. GET: Dashboard de Administrador (Para la lógica de los 10 minutos)
 app.get('/admin/status', async (req, res) => {
   try {
     // Trae absolutamente todas las salas para monitoreo crudo
