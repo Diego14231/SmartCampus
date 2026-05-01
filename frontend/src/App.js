@@ -5,7 +5,12 @@ import axios from 'axios';
 function App() {
   const [pisos, setPisos] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const getTextColor = (disponibles) => {
+  if (disponibles === 1) return 'text-red-500';
+  if (disponibles === 2) return 'text-orange-600';
+  if (disponibles === 3) return 'text-yellow-500';
+  return 'text-udp-neon';
+  };
   // Función para obtener los datos de tu API de Node.js
   const fetchStatus = async () => {
     try {
@@ -49,8 +54,9 @@ function App() {
               </div>
 
               <div className="flex items-baseline space-x-2">
-                <span className="text-6xl font-bold text-udp-neon">{pisoData.totalDisponibles}</span>
-                <span className="text-xl text-slate-400">salas libres</span>
+                <span className={`text-6xl font-bold ${getTextColor(pisoData.totalDisponibles)}`}>{pisoData.totalDisponibles}</span>
+                <span className="text-3xl font-medium text-slate-500">/ {pisoData.totalMaximo}</span>
+                <span className="text-xl text-slate-400 ml-2">salas libres</span>
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-800 flex items-center text-slate-500 text-sm">

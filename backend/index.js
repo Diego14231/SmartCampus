@@ -82,11 +82,15 @@ app.get('/api/status', async (req, res) => {
         $group: { 
           _id: "$piso",                // 2. Agrúpalas por piso
           totalDisponibles: { $sum: 1 }, // 3. Cuenta cuántas hay en ese grupo
-          totalMaximo: { $literal: 5 }, // Agregamos el total fijo de 5 salas por piso
           ultimaActualizacion: { $max: "$ultimaActualizacion" } // 4. Busca la hora más reciente del piso
         } 
       },
-      { $sort: { _id: -1 } } // Ordena por piso (Piso 1, luego Piso 2)
+      {
+          $addFields: {
+            totalMaximo: 5 // Esto agrega el campo 5 a cada piso sin usar operadores raros
+        }
+      },
+      { $sort: { _id: 1 } } // Ordena por piso (Piso 1, luego Piso 2)
     ]);
 
     res.status(200).json(resumen);
