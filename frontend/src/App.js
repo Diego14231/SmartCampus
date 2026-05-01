@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+
 function App() {
   const [pisos, setPisos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,7 @@ function App() {
             <div key={pisoData._id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold">
-                  {pisoData._id === -1 ? 'Zócalo (Piso -1)' : `Piso ${pisoData._id}`}
+                  {pisoData._id === -1 ? 'Piso -1' : `Piso ${pisoData._id}`}
                 </h2>
                 <span className="bg-udp-neon/10 text-udp-neon px-3 py-1 rounded-full text-sm font-medium">
                   En línea
@@ -62,14 +63,14 @@ function App() {
           {/* Mensaje de Gestión de Expectativas */}
           <div className="mt-8 p-4 bg-slate-800/30 rounded-2xl text-center">
             <p className="text-sm text-slate-400 italic">
-              "Recuerda que la disponibilidad puede cambiar mientras caminas a la sala."
+              "Recuerda que la disponibilidad puede cambiar, ya que se realizan actualizaciones cada 30 segundos."
             </p>
           </div>
         </div>
       )}
 
       <footer className="mt-auto pt-10 text-slate-600 text-xs text-center">
-        &copy; 2024 SmartCampus Project | Diego Valenzuela
+        &copy; 2026 SmartCampus Project
       </footer>
     </div>
   );
