@@ -29,9 +29,6 @@ function PublicView() {
     return () => clearInterval(interval);
   }, []);
 
-  const ultimaSincronizacion = pisos.length > 0 
-  ? new Date(Math.max(...pisos.map(p => new Date(p.ultimaActualizacion))))
-  : null;
 
 
   return (
@@ -64,7 +61,10 @@ function PublicView() {
                 <span className="text-xl text-slate-400 ml-2">salas libres</span>
               </div>
 
-              
+              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center text-slate-500 text-sm">
+                <i className="fa-regular fa-clock mr-2"></i>
+    
+              </div>
             </div>
           ))}
 
