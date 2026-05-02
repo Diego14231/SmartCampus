@@ -14,7 +14,14 @@ const salaSchema = new mongoose.Schema({
     type: Boolean, 
     default: false 
   },
-  ultimaActualizacion: { type: Date, default: Date.now }
+  hayMovimiento: {
+    type: Boolean,
+    default: false
+  },
+  ultimaActualizacion: { 
+    type: Date, 
+    default: Date.now 
+  }
 });
 
 module.exports = mongoose.model('Sala', salaSchema);

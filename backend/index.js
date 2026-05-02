@@ -4,6 +4,7 @@ const cors = require('cors');
 const Sala = require('./models/Sala');
 
 const app = express();
+const TIEMPO_GRACIA_MS = 1000 * 10 * 1;
 
 // Middlewares
 app.use(cors());
@@ -20,7 +21,7 @@ mongoose.connect('mongodb://localhost:27017/smartcampus')
 
 // 1. POST: El ESP32 de Jordi envía datos aquí
 app.post('/api/update', async (req, res) => {
-  const { idSala, piso, ocupada } = req.body;
+  const { idSala, piso, ocupada, hayMovimiento } = req.body;
   const pisosValidos = [-1, 2]; // Solo esos pisos existen en el edificio
 
   if (!pisosValidos.includes(piso)) {
@@ -32,6 +33,7 @@ app.post('/api/update', async (req, res) => {
     const salaExistente = await Sala.findOne({ idSala });
 
     if (salaExistente) {
+
         // 2. Si la sala ya existe y el usuario intenta cambiarla de piso:
         if (salaExistente.piso !== piso) {
             // Verificamos si el piso de DESTINO tiene espacio
@@ -45,13 +47,38 @@ app.post('/api/update', async (req, res) => {
             salaExistente.piso = piso;
         }
 
-        // 3. Actualizamos los demás datos (esté en el mismo piso o no)
+        if (hayMovimiento) {
+        salaExistente.ocupada = true; 
+        console.log(`Se detectó movimiento en: ${idSala}`);
+        }
+
+        else{
         salaExistente.ocupada = ocupada;
+        }
+
+        salaExistente.hayMovimiento= hayMovimiento;
         salaExistente.ultimaActualizacion = Date.now();
         
         await salaExistente.save();
+
+        // === INICIO LÓGICA TTL (SALA EXISTENTE) ===
+      if (!hayMovimiento && ocupada) {
+        setTimeout(async () => {
+          const salaCheck = await Sala.findOne({ idSala });
+          if (salaCheck && !salaCheck.hayMovimiento) {
+            salaCheck.ocupada = false;
+            salaCheck.ultimaActualizacion = Date.now();
+            await salaCheck.save();
+            console.log(`Liberada: ${idSala} por inactividad.`);
+          }
+        }, TIEMPO_GRACIA_MS);
+      }
+      // === FIN LÓGICA TTL ===
         return res.status(200).json(salaExistente);
+
+
     }
+
 
     // 4. Si la sala es NUEVA (no existía en ningún piso):
     const salasNuevasEnPiso = await Sala.countDocuments({ piso });
@@ -61,10 +88,28 @@ app.post('/api/update', async (req, res) => {
         });
     }
 
-    // 5. Creamos la sala desde cero
-    const nuevaSala = new Sala({ idSala, piso, ocupada });
+    // 5. Creamos la sala desde cero con logica para saber si hay movimento, por defecto sera false.
+    const nuevaSala = new Sala({ idSala, piso, ocupada, hayMovimiento: hayMovimiento || false });
     await nuevaSala.save();
+
+    // === INICIO LÓGICA TTL (SALA NUEVA) ===
+    if (!hayMovimiento && ocupada) {
+      setTimeout(async () => {
+        const salaCheck = await Sala.findOne({ idSala });
+        if (salaCheck && !salaCheck.hayMovimiento) {
+          salaCheck.ocupada = false;
+          salaCheck.ultimaActualizacion = Date.now();
+          await salaCheck.save();
+        }
+      }, TIEMPO_GRACIA_MS);
+    }
+    // === FIN LÓGICA TTL ===
+
     res.status(201).json(nuevaSala);
+
+
+    
+
 
 } catch (error) {
     console.error(error);
