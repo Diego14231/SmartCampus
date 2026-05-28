@@ -19,9 +19,11 @@ app.use(express.json()); // Permite leer los JSON que envíe Jordi
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 
-// Conexión a MongoDB (asumiendo que tu Docker ya está corriendo en el puerto 27017)
-mongoose.connect('mongodb://localhost:27017/smartcampus')
-  .then(() => console.log('Conexión exitosa a MongoDB Dockerizado'))
+// Conexión a MongoDB
+//Creamos una variable para la URI de MongoDB, que puede ser configurada a través de una variable de entorno o usar un valor por defecto.
+const mongoURI = process.env.MONGO_URL || 'mongodb://localhost:27017/smartcampus';
+mongoose.connect(mongoURI)
+  .then(() => console.log('Conexión exitosa a MongoDB'))
   .catch(err => console.error('Error conectando a Mongo:', err));
 
 app.post('/api/update', async (req, res) => {
