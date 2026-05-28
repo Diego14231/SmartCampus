@@ -1,0 +1,59 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "SmartCampus API",
+    "version": "1.0.0",
+    "description": "Documentación interactiva para conectar el hardware (ESP32) de Jordi y el Frontend en React"
+  },
+  "paths": {
+    "/api/update": {
+      "post": {
+        "summary": "Actualiza o registra el estado de una sala enviado por el ESP32 (Jordi)",
+        "description": "Permite recibir datos de ocupación y movimiento. Controla el límite de 5 salas por piso y aplica lógica de TTL por inactividad.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["idSala", "piso", "ocupada", "hayMovimiento"],
+                "properties": {
+                  "idSala": { "type": "string", "example": "Sala-A" },
+                  "piso": { "type": "integer", "example": 2 },
+                  "ocupada": { "type": "boolean", "example": true },
+                  "hayMovimiento": { "type": "boolean", "example": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Sala existente actualizada correctamente." },
+          "201": { "description": "Nueva sala registrada con éxito." },
+          "400": { "description": "Error de validación (Piso inválido o límite de salas superado)." },
+          "500": { "description": "Error interno del servidor." }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "Obtiene el resumen de salas disponibles agrupadas por piso",
+        "description": "Endpoint utilizado por el Frontend (React) para mostrar la disponibilidad general.",
+        "responses": {
+          "200": { "description": "Lista agregada con éxito." },
+          "500": { "description": "Error al calcular disponibilidad." }
+        }
+      }
+    },
+    "/admin/status": {
+      "get": {
+        "summary": "Dashboard de Administración",
+        "description": "Devuelve el listado completo y crudo de todas las salas para el monitoreo del Admin Dashboard.",
+        "responses": {
+          "200": { "description": "Listado completo de salas obtenido." },
+          "500": { "description": "Error obteniendo datos de administración." }
+        }
+      }
+    }
+  }
+}

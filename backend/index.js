@@ -3,23 +3,27 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const Sala = require('./models/Sala');
 
+// 1. Importamos las librerías de Swagger
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger.json');
+
 const app = express();
-const TIEMPO_GRACIA_MS = 1000 * 10 * 1;
+const TIEMPO_GRACIA_MS = 1000 * 10 * 1; // 10 segundos configurados actualmente
 
 // Middlewares
 app.use(cors());
 app.use(express.json()); // Permite leer los JSON que envíe Jordi
+
+
+// Ruta donde estará disponible el menú interactivo
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 
 // Conexión a MongoDB (asumiendo que tu Docker ya está corriendo en el puerto 27017)
 mongoose.connect('mongodb://localhost:27017/smartcampus')
   .then(() => console.log('Conexión exitosa a MongoDB Dockerizado'))
   .catch(err => console.error('Error conectando a Mongo:', err));
 
-// ==========================================
-// RUTAS / ENDPOINTS (CRUD)
-// ==========================================
-
-// 1. POST: El ESP32 de Jordi envía datos aquí
 app.post('/api/update', async (req, res) => {
   const { idSala, piso, ocupada, hayMovimiento } = req.body;
   const pisosValidos = [-1, 2]; // Solo esos pisos existen en el edificio
@@ -33,7 +37,6 @@ app.post('/api/update', async (req, res) => {
     const salaExistente = await Sala.findOne({ idSala });
 
     if (salaExistente) {
-
         // 2. Si la sala ya existe y el usuario intenta cambiarla de piso:
         if (salaExistente.piso !== piso) {
             // Verificamos si el piso de DESTINO tiene espacio
@@ -48,37 +51,32 @@ app.post('/api/update', async (req, res) => {
         }
 
         if (hayMovimiento) {
-        salaExistente.ocupada = true; 
-        console.log(`Se detectó movimiento en: ${idSala}`);
+          salaExistente.ocupada = true; 
+          console.log(`Se detectó movimiento en: ${idSala}`);
+        } else {
+          salaExistente.ocupada = ocupada;
         }
 
-        else{
-        salaExistente.ocupada = ocupada;
-        }
-
-        salaExistente.hayMovimiento= hayMovimiento;
+        salaExistente.hayMovimiento = hayMovimiento;
         salaExistente.ultimaActualizacion = Date.now();
         
         await salaExistente.save();
 
         // === INICIO LÓGICA TTL (SALA EXISTENTE) ===
-      if (!hayMovimiento && ocupada) {
-        setTimeout(async () => {
-          const salaCheck = await Sala.findOne({ idSala });
-          if (salaCheck && !salaCheck.hayMovimiento) {
-            salaCheck.ocupada = false;
-            salaCheck.ultimaActualizacion = Date.now();
-            await salaCheck.save();
-            console.log(`Liberada: ${idSala} por inactividad.`);
-          }
-        }, TIEMPO_GRACIA_MS);
-      }
-      // === FIN LÓGICA TTL ===
+        if (!hayMovimiento && ocupada) {
+          setTimeout(async () => {
+            const salaCheck = await Sala.findOne({ idSala });
+            if (salaCheck && !salaCheck.hayMovimiento) {
+              salaCheck.ocupada = false;
+              salaCheck.ultimaActualizacion = Date.now();
+              await salaCheck.save();
+              console.log(`Liberada: ${idSala} por inactividad.`);
+            }
+          }, TIEMPO_GRACIA_MS);
+        }
+        // === FIN LÓGICA TTL ===
         return res.status(200).json(salaExistente);
-
-
     }
-
 
     // 4. Si la sala es NUEVA (no existía en ningún piso):
     const salasNuevasEnPiso = await Sala.countDocuments({ piso });
@@ -107,18 +105,13 @@ app.post('/api/update', async (req, res) => {
 
     res.status(201).json(nuevaSala);
 
-
-    
-
-
-} catch (error) {
+  } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error interno del servidor" });
-}
+  }
 });
 
-// 2. GET: El Frontend (React) pide cuántas salas libres hay por piso
-// En tu index.js, actualiza el GET /api/status así:
+
 app.get('/api/status', async (req, res) => {
   try {
     const resumen = await Sala.aggregate([
@@ -144,7 +137,7 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// 3. GET: Dashboard de Administrador (Para la lógica de los 10 minutos)
+
 app.get('/admin/status', async (req, res) => {
   try {
     // Trae absolutamente todas las salas para monitoreo crudo
@@ -161,4 +154,5 @@ app.get('/admin/status', async (req, res) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Servidor SmartCampus corriendo en http://localhost:${PORT}`);
+  console.log(`Documentación de Swagger disponible en: http://localhost:${PORT}/docs`);
 });
