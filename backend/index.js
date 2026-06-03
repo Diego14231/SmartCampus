@@ -150,6 +150,31 @@ app.get('/admin/status', async (req, res) => {
   }
 });
 
+app.delete('/api/salas/:idSala', async (req, res) => {
+  const { idSala } = req.params;
+
+  try {
+    // Buscamos la sala por su identificador único y la eliminamos
+    const salaEliminada = await Sala.findOneAndDelete({ idSala });
+
+    // Si la sala no existía en la base de datos
+    if (!salaEliminada) {
+      return res.status(404).json({ error: `La sala con ID '${idSala}' no existe.` });
+    }
+
+    // Respuesta exitosa
+    res.status(200).json({ 
+      mensaje: `Sala '${idSala}' eliminada correctamente de la base de datos.`,
+      sala: salaEliminada 
+    });
+
+  } catch (error) {
+    console.error("Error al eliminar la sala:", error);
+    res.status(500).json({ error: "Error interno del servidor al intentar eliminar." });
+  }
+});
+
+
 // ==========================================
 // INICIO DEL SERVIDOR
 // ==========================================
