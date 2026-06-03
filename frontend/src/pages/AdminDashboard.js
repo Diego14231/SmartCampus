@@ -19,6 +19,14 @@ function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+    if (salas.length === 0) {
+      return (
+        <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+          <p className="text-udp-neon animate-pulse">Cargando estaciones de monitoreo...</p>
+        </div>
+      );
+    } 
+
   return (
     <div className="min-h-screen bg-slate-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-8 text-udp-neon">Panel de Administración</h1>

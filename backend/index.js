@@ -154,7 +154,12 @@ app.get('/admin/status', async (req, res) => {
 // INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 4000;
+
+const HOST = process.env.RAILWAY_STATIC_URL 
+  ? `https://${process.env.RAILWAY_STATIC_URL}` 
+  : `http://localhost:${PORT}`;
+
 app.listen(PORT, () => {
-  console.log(`Servidor SmartCampus corriendo en http://localhost:${PORT}`);
-  console.log(`Documentación de Swagger disponible en: http://localhost:${PORT}/docs`);
+  console.log(`Servidor SmartCampus corriendo en: ${HOST}`);
+  console.log(`Documentación de Swagger disponible en: ${HOST}/docs`);
 });

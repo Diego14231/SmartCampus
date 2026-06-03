@@ -25,7 +25,7 @@ function PublicView() {
   // Esto ejecuta la función apenas se abre la web y cada 30 segundos
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30000); 
+    const interval = setInterval(fetchStatus, 10000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -63,7 +63,7 @@ function PublicView() {
 
               <div className="mt-6 pt-4 border-t border-slate-800 flex items-center text-slate-500 text-sm">
                 <i className="fa-regular fa-clock mr-2"></i>
-    
+                Última actualización: {new Date(pisoData.ultimaActualizacion).toLocaleTimeString()}
               </div>
             </div>
           ))}
@@ -71,7 +71,7 @@ function PublicView() {
           {/* Mensaje de Gestión de Expectativas */}
           <div className="mt-8 p-4 bg-slate-800/30 rounded-2xl text-center">
             <p className="text-sm text-slate-400 italic">
-              "Recuerda que la disponibilidad puede cambiar, ya que se realizan actualizaciones cada 30 segundos."
+              "Los datos se sincronizan automáticamente cada 10 segundos. Podrían existir breves diferencias con el estado real de la sala."
             </p>
           </div>
         </div>
