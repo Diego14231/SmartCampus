@@ -6,7 +6,7 @@ function AdminDashboard() {
 
   const fetchAdminStatus = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/admin/status`);
+      const response = await axios.get(`/admin/status`);
       setSalas(response.data);
     } catch (error) {
       console.error("Error obteniendo datos de administración:", error);

@@ -14,7 +14,7 @@ function PublicView() {
   // Función para obtener los datos de tu API de Node.js
   const fetchStatus = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/status`);
+      const response = await axios.get(`/api/status`);
       setPisos(response.data);
       setLoading(false);
     } catch (error) {
@@ -44,7 +44,7 @@ function PublicView() {
       ) : (
         <div className="w-full max-w-md space-y-6">
           {/* Mapeamos los datos que vienen del backend */}
-          {pisos.map((pisoData) => (
+          {Array.isArray(pisos) && pisos.map((pisoData) => (
             <div key={pisoData._id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold">
