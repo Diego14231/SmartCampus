@@ -31,7 +31,7 @@ function AdminDashboard() {
     <div className="min-h-screen bg-slate-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-8 text-udp-neon">Panel de Administración</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {salas.map((sala) => (
+        {Array.isArray(salas) && salas.map((sala) => (
             <div key={sala._id} className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                     <div className="flex justify-between items-start mb-4">
                     <h2 className="text-xl font-bold text-white">{sala.idSala}</h2>
