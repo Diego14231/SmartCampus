@@ -9,6 +9,7 @@ const swaggerDocument = require('./swagger.json');
 
 const app = express();
 const TIEMPO_GRACIA_MS = 1000 * 10 * 1; // 10 segundos configurados actualmente
+const mqtt = require('mqtt');
 
 // Middlewares
 app.use(cors());
@@ -18,7 +19,6 @@ app.use(express.json()); // Permite leer los JSON que envíe Jordi
 // Ruta donde estará disponible el menú interactivo
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-
 // Conexión a MongoDB
 //Creamos una variable para la URI de MongoDB, que puede ser configurada a través de una variable de entorno o usar un valor por defecto.
 const mongoURI = process.env.MONGO_URL || 'mongodb://localhost:27017/smartcampus';
@@ -26,73 +26,54 @@ mongoose.connect(mongoURI)
   .then(() => console.log('Conexión exitosa a MongoDB'))
   .catch(err => console.error('Error conectando a Mongo:', err));
 
-app.post('/api/update', async (req, res) => {
-  const { idSala, piso, ocupada, hayMovimiento } = req.body;
-  const pisosValidos = [-1, 2]; // Solo esos pisos existen en el edificio
 
+
+// =========================================================================
+// 1. CONFIGURACIÓN E IMPLEMENTACIÓN DE MQTT
+// =========================================================================
+
+
+// Configuración dinámica del Broker vía variables de entorno (Local o AWS)
+const MQTT_URL = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const client = mqtt.connect(MQTT_URL);
+
+
+// FUNCIÓN AUXILIAR: Centraliza toda la lógica de negocio e impacta en MongoDB
+async function actualizarLogicaSala(idSala, piso, ocupada, hayMovimiento) {
+  const pisosValidos = [-1, 2]; // Solo esos pisos existen en el edificio
+  
   if (!pisosValidos.includes(piso)) {
-    return res.status(400).json({ error: "Piso no válido. Solo se permiten salas en el piso -1 y 2." });
+    throw new Error("Piso no válido. Solo se permiten salas en el piso -1 y 2.");
   }
 
-  try {
-    // 1. Buscamos si la sala ya existe globalmente por su nombre (idSala)
-    const salaExistente = await Sala.findOne({ idSala });
+  // 1. Buscamos si la sala ya existe globalmente por su nombre (idSala)
+  const salaExistente = await Sala.findOne({ idSala });
 
-    if (salaExistente) {
-        // 2. Si la sala ya existe y el usuario intenta cambiarla de piso:
-        if (salaExistente.piso !== piso) {
-            // Verificamos si el piso de DESTINO tiene espacio
-            const salasEnDestino = await Sala.countDocuments({ piso });
-            if (salasEnDestino >= 5) {
-                return res.status(400).json({ 
-                    error: `No se puede mover la sala: el piso ${piso} ya alcanzó el máximo de 5 salas.` 
-                });
-            }
-            // Si tiene espacio, actualizamos el piso
-            salaExistente.piso = piso;
-        }
-
-        if (hayMovimiento) {
-          salaExistente.ocupada = true; 
-          console.log(`Se detectó movimiento en: ${idSala}`);
-        } else {
-          salaExistente.ocupada = ocupada;
-        }
-
-        salaExistente.hayMovimiento = hayMovimiento;
-        salaExistente.ultimaActualizacion = Date.now();
-        
-        await salaExistente.save();
-
-        // === INICIO LÓGICA TTL (SALA EXISTENTE) ===
-        if (!hayMovimiento && ocupada) {
-          setTimeout(async () => {
-            const salaCheck = await Sala.findOne({ idSala });
-            if (salaCheck && !salaCheck.hayMovimiento) {
-              salaCheck.ocupada = false;
-              salaCheck.ultimaActualizacion = Date.now();
-              await salaCheck.save();
-              console.log(`Liberada: ${idSala} por inactividad.`);
-            }
-          }, TIEMPO_GRACIA_MS);
-        }
-        // === FIN LÓGICA TTL ===
-        return res.status(200).json(salaExistente);
+  if (salaExistente) {
+    // 2. Si la sala ya existe y se intenta cambiarla de piso:
+    if (salaExistente.piso !== piso) {
+      // Verificamos si el piso de DESTINO tiene espacio
+      const salasEnDestino = await Sala.countDocuments({ piso });
+      if (salasEnDestino >= 5) {
+        throw new Error(`No se puede mover la sala: el piso ${piso} ya alcanzó el máximo de 5 salas.`);
+      }
+      // Si tiene espacio, actualizamos el piso
+      salaExistente.piso = piso;
     }
 
-    // 4. Si la sala es NUEVA (no existía en ningún piso):
-    const salasNuevasEnPiso = await Sala.countDocuments({ piso });
-    if (salasNuevasEnPiso >= 5) {
-        return res.status(400).json({ 
-            error: `El piso ${piso} ya tiene el máximo de 5 salas.` 
-        });
+    if (hayMovimiento) {
+      salaExistente.ocupada = true; 
+      console.log(`Se detectó movimiento en: ${idSala}`);
+    } else {
+      salaExistente.ocupada = ocupada;
     }
 
-    // 5. Creamos la sala desde cero con logica para saber si hay movimento, por defecto sera false.
-    const nuevaSala = new Sala({ idSala, piso, ocupada, hayMovimiento: hayMovimiento || false });
-    await nuevaSala.save();
+    salaExistente.hayMovimiento = hayMovimiento;
+    salaExistente.ultimaActualizacion = Date.now();
+    
+    await salaExistente.save();
 
-    // === INICIO LÓGICA TTL (SALA NUEVA) ===
+    // === INICIO LÓGICA TTL (SALA EXISTENTE) ===
     if (!hayMovimiento && ocupada) {
       setTimeout(async () => {
         const salaCheck = await Sala.findOne({ idSala });
@@ -100,20 +81,83 @@ app.post('/api/update', async (req, res) => {
           salaCheck.ocupada = false;
           salaCheck.ultimaActualizacion = Date.now();
           await salaCheck.save();
+          console.log(`[MQTT/HTTP] Liberada: ${idSala} por inactividad.`);
         }
       }, TIEMPO_GRACIA_MS);
     }
     // === FIN LÓGICA TTL ===
+    
+    return salaExistente;
+  }
 
-    res.status(201).json(nuevaSala);
+  // 4. Si la sala es NUEVA (no existía en ningún piso):
+  const salasNuevasEnPiso = await Sala.countDocuments({ piso });
+  if (salasNuevasEnPiso >= 5) {
+    throw new Error(`El piso ${piso} ya tiene el máximo de 5 salas.`);
+  }
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error interno del servidor" });
+  // 5. Creamos la sala desde cero con lógica para saber si hay movimiento
+  const nuevaSala = new Sala({ idSala, piso, ocupada, hayMovimiento: hayMovimiento || false });
+  await nuevaSala.save();
+
+  // === INICIO LÓGICA TTL (SALA NUEVA) ===
+  if (!hayMovimiento && ocupada) {
+    setTimeout(async () => {
+      const salaCheck = await Sala.findOne({ idSala });
+      if (salaCheck && !salaCheck.hayMovimiento) {
+        salaCheck.ocupada = false;
+        salaCheck.ultimaActualizacion = Date.now();
+        await salaCheck.save();
+        console.log(`[MQTT/HTTP] Liberada sala nueva: ${idSala} por inactividad.`);
+      }
+    }, TIEMPO_GRACIA_MS);
+  }
+  // === FIN LÓGICA TTL ===
+
+  return nuevaSala;
+}
+
+// Conexión y escucha al canal del Broker Mosquitto
+client.on('connect', () => {
+  console.log(`Conectado exitosamente al Broker MQTT en ${MQTT_URL}`);
+  // Pasamos el objeto { qos: 1 } como segundo argumento
+  client.subscribe('campus/salas/update', { qos: 1 }, (err) => {
+    if (!err) console.log('Suscrito exitosamente al tópico con QoS 1');
+  });
+});
+
+client.on('message', async (topic, message) => {
+  if (topic === 'campus/salas/update') {
+    try {
+      const data = JSON.parse(message.toString());
+      const { idSala, piso, ocupada, hayMovimiento } = data;
+      
+      console.log(`[MQTT] Procesando actualización remota para: ${idSala}`);
+      
+      // Impacta directamente en MongoDB reutilizando la función mágica
+      const salaActualizada = await actualizarLogicaSala(idSala, piso, ocupada, hayMovimiento);
+      
+      console.log(`[MQTT] Base de datos sincronizada con éxito para ${salaActualizada.idSala}`);
+    } catch (error) {
+      console.error("[MQTT] Error procesando mensaje de sensor:", error.message);
+    }
   }
 });
 
 
+// NUEVA RUTA POST para recibir actualizaciones desde HTTP (Jordi) y reutilizar la misma lógica de negocio
+app.post('/api/update', async (req, res) => {
+  const { idSala, piso, ocupada, hayMovimiento } = req.body;
+  try {
+    const resultado = await actualizarLogicaSala(idSala, piso, ocupada, hayMovimiento);
+    res.status(200).json(resultado);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+
+// Ruta para el frontend público, que muestra un resumen de disponibilidad por piso
 app.get('/api/status', async (req, res) => {
   try {
     const resumen = await Sala.aggregate([
@@ -140,6 +184,7 @@ app.get('/api/status', async (req, res) => {
 });
 
 
+// Ruta exclusiva para el panel de administración, que muestra TODO el detalle de cada sala
 app.get('/admin/status', async (req, res) => {
   try {
     // Trae absolutamente todas las salas para monitoreo crudo
@@ -150,6 +195,9 @@ app.get('/admin/status', async (req, res) => {
   }
 });
 
+
+
+//DELETE: Permite eliminar una sala por su idSala (nombre único)
 app.delete('/api/salas/:idSala', async (req, res) => {
   const { idSala } = req.params;
 
