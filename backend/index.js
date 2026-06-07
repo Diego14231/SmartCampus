@@ -185,7 +185,7 @@ app.get('/api/status', async (req, res) => {
 
 
 // Ruta exclusiva para el panel de administración, que muestra TODO el detalle de cada sala
-app.get('/admin/status', async (req, res) => {
+app.get('/api/admin/status', async (req, res) => {
   try {
     // Trae absolutamente todas las salas para monitoreo crudo
     const todasLasSalas = await Sala.find({});
